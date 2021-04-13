@@ -8,6 +8,7 @@
 #include <string.h>
 #include <climits>
 #include <string>
+#include <math.h>
 #include "define.h"
 // #include <bits/stdc++.h>
 
@@ -171,7 +172,7 @@ void map_patches(image *a, image *b, image *ann, image *out)
 }
 
 
-void patchmatch(image *a, image *b, image *ann, image *annd) {
+void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf) {
 
   int aew = a->width - patch_width+1, aeh = a->height - patch_width + 1, aed = a->depth - patch_width + 1;       /* Effective width and height (possible upper left corners of patches). */
   int bew = b->width - patch_width+1, beh = b->height - patch_width + 1, bed = b->depth - patch_width + 1;
@@ -183,49 +184,41 @@ void patchmatch(image *a, image *b, image *ann, image *annd) {
         int by = rand()%beh;
         int bz = rand()%bed;
         unsigned char* pixelOffset = ann->getRGB(az, ay, ax);
+        unsigned char* bufOffsets = ann_buf->getRGB(az, ay, ax);
         storeXYasRGB(pixelOffset, bx, by, bz);
+        storeXYasRGB(bufOffsets, bx, by, bz);
         unsigned char* distOffset = annd->getRGB(az, ay, ax);
-        int distance = dist(a, b, ax, ay, az, bx, by, bz);
-        storeintasRGBA(distOffset, distance);
+        // int distance = dist(a, b, ax, ay, az, bx, by, bz);
+        // storeintasRGBA(distOffset, distance);
       }
     }
   }
-
-  for (int az = 0; az < aed; az++) {
-    for (int ay = 0; ay < aeh; ay++) {
-      for (int ax = 0; ax < aew; ax++){
-        unsigned char* pixelOffset = ann->getRGB(az, ay, ax);
-        int x = XfromRGB(pixelOffset);
-        int y = YfromRGB(pixelOffset);
-        int z = ZfromRGB(pixelOffset);
-        if (x >= bew || y >= beh || z >= bed){
-          cout << x << " " << y << " " << z << endl;
-        }
-      }
-    }
-  }
-
 
  for (int iter = 0; iter < patch_match_iters; iter++) {
     int zstart = 0, zend = aed, zchange = 1;
     int ystart = 0, yend = aeh, ychange = 1;
     int xstart = 0, xend = aew, xchange = 1;
+    image* ann_to_use = ann;
+    image* other = ann_buf;
 
     if (iter % 2 == 1) {
       zstart = zend-1; zend = -1; zchange = -1;
       ystart = yend-1; yend = -1; ychange = -1;
       xstart = xend-1; xend = -1; xchange = -1;
+      ann_to_use = ann_buf;
+      other = ann;
     }
     for (int az = zstart; az != zend; az += zchange){
       for (int ay = ystart; ay != yend; ay += ychange) {
         for (int ax = xstart; ax != xend; ax += xchange) { 
-          unsigned char* v = ann->getRGB(az, ay, ax);
+          unsigned char* v = ann_to_use->getRGB(az, ay, ax);
           int ybest = YfromRGB(v), xbest = XfromRGB(v), zbest = ZfromRGB(v);
-          int dbest = netINT(annd->getRGB(az, ay, ax));
+          int dbest = dist(a, b, ax, ay, az, xbest, ybest, zbest);
+          // int dbest = netINT(annd->getRGB(az, ay, ax));
 
           // Propagation
           if ((unsigned) (ax - xchange) < (unsigned) aew) {
-            unsigned char* vp = ann->getRGB(az, ay, ax-xchange);
+            unsigned char* vp = ann_to_use->getRGB(az, ay, ax-xchange);
             int xp = XfromRGB(vp) + xchange, yp = YfromRGB(vp), zp = ZfromRGB(vp);
             if ((unsigned) xp < (unsigned) bew) {
               improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
@@ -233,7 +226,7 @@ void patchmatch(image *a, image *b, image *ann, image *annd) {
           }
 
           if ((unsigned) (ay - ychange) < (unsigned) aeh) {
-            unsigned char* vp = ann->getRGB(az, ay-ychange, ax);
+            unsigned char* vp = ann_to_use->getRGB(az, ay-ychange, ax);
             int xp = XfromRGB(vp), yp = YfromRGB(vp) + ychange, zp = ZfromRGB(vp);
             if ((unsigned) yp < (unsigned) beh) {
               improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
@@ -241,7 +234,7 @@ void patchmatch(image *a, image *b, image *ann, image *annd) {
           }
 
           if ((unsigned) (az - zchange) < (unsigned) aed) {
-            unsigned char* vp = ann->getRGB(az-zchange, ay, ax);
+            unsigned char* vp = ann_to_use->getRGB(az-zchange, ay, ax);
             int xp = XfromRGB(vp), yp = YfromRGB(vp), zp = ZfromRGB(vp) + zchange;
             if ((unsigned) zp < (unsigned) bed) {
               improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
@@ -274,12 +267,12 @@ void patchmatch(image *a, image *b, image *ann, image *annd) {
             improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
           }
 
-          storeXYasRGB(ann->getRGB(az, ay, ax), xbest, ybest, zbest);
-          storeintasRGBA(annd->getRGB(az, ay, ax), dbest);
+          storeXYasRGB(other->getRGB(az, ay, ax), xbest, ybest, zbest);
+          // storeintasRGBA(annd->getRGB(az, ay, ax), dbest);
         }
       }
     }
- }
+ }  
 }
 
 double compute_error(image* output, image* a)
@@ -346,16 +339,19 @@ int main(int argc, char **argv) {
 
   image* ann = NULL;
   image* annd = NULL;
+  image* ann_buf = NULL;
   ann = new image(img1 -> width, img1 -> height, img1 -> depth ,3);
   annd = new image(img1 -> width, img1 -> height, img1 -> depth ,4);
+  ann_buf = new image(img1 -> width, img1 -> height, img1 -> depth ,3);
   ann->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
+  ann_buf->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
   annd->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*4);
 
   image* output = new image(img1->width, img1->height, img1 -> depth,3);
   output->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
 
   cout << "Starting patch match" << endl;
-  patchmatch(img1, img2, ann, annd);
+  patchmatch(img1, img2, ann, annd, ann_buf);
   cout << "starting map patches" << endl;
   map_patches(img1, img2, ann, output);
 
@@ -378,6 +374,8 @@ int main(int argc, char **argv) {
     string output_path= output_folder+ to_string(i) +".png";
     stbi_write_png(output_path.c_str(), output->width, output->height, 3, output->img_pixels + output_start_idx, output->width*3);
   }
+
+  cout << "The Error computed is " << compute_error(output, img1) << endl;
   
   return 0;
 }

@@ -1,2 +1,4 @@
 patchmatch/
-vscode/
+.vscode/
+a.out
+a.exe
