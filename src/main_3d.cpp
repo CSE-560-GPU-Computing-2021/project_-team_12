@@ -9,6 +9,7 @@
 #include <climits>
 #include <string>
 #include "define.h"
+#include <chrono>
 // #include <bits/stdc++.h>
 
 #include "stb_image.h"
@@ -308,9 +309,6 @@ double compute_error(image* output, image* a)
 
 
 int main(int argc, char **argv) {
-	int d = 64;
-	int h = 256;
-	int w = 128;
   if(argc < 3) {
     cout<<"Usage: " << argv[0] << " <image_file1>  <image_file2>\n";
     return 1;
@@ -354,12 +352,25 @@ int main(int argc, char **argv) {
   image* output = new image(img1->width, img1->height, img1 -> depth,3);
   output->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
 
+  printf("%d %d %d\n",output->width, output->height, output->depth );
+
   cout << "Starting patch match" << endl;
+  auto start1 = std::chrono::high_resolution_clock::now();
   patchmatch(img1, img2, ann, annd);
+  auto finish1 = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = finish1 - start1;
+  std::cout << "Patch Match Elapsed time: " << elapsed.count() << " s\n";
+
+  auto start2 = std::chrono::high_resolution_clock::now();
   cout << "starting map patches" << endl;
   map_patches(img1, img2, ann, output);
+  auto finish2 = std::chrono::high_resolution_clock::now();
+  elapsed = finish2 - start2;
+  std::cout << "Map Back Elapsed time: " << elapsed.count() << " s\n";
 
-  printf("%d %d %d\n",output->width, output->height, output->depth );
+  elapsed = finish2 - start1;
+  std::cout << "Total time Elapsed time: " << elapsed.count() << " s\n";
+
 
   string output_folder = "./color/out/";
   string ann_folder = "./color/ann/";
