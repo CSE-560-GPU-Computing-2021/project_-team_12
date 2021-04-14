@@ -177,7 +177,7 @@ void map_patches(image *a, image *b, image *ann, image *out)
 }
 
 
-void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf) {
+void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf, image *annd_buf) {
 
   int aew = a->width - patch_width+1, aeh = a->height - patch_width + 1, aed = a->depth - patch_width + 1;       /* Effective width and height (possible upper left corners of patches). */
   int bew = b->width - patch_width+1, beh = b->height - patch_width + 1, bed = b->depth - patch_width + 1;
@@ -193,8 +193,10 @@ void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf) {
         storeXYasRGB(pixelOffset, bx, by, bz);
         storeXYasRGB(bufOffsets, bx, by, bz);
         unsigned char* distOffset = annd->getRGB(az, ay, ax);
-        // int distance = dist(a, b, ax, ay, az, bx, by, bz);
-        // storeintasRGBA(distOffset, distance);
+        int distance = dist(a, b, ax, ay, az, bx, by, bz);
+        storeintasRGBA(distOffset, distance);
+        unsigned char* distOffset_buf = annd_buf->getRGB(az, ay, ax);
+        storeintasRGBA(distOffset_buf, distance);
       }
     }
   }
@@ -206,20 +208,24 @@ void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf) {
     image* ann_to_use = ann;
     image* other = ann_buf;
 
+    image* annd_to_use = annd;
+    image* annd_other = annd_buf;
+
     if (iter % 2 == 1) {
       zstart = zend-1; zend = -1; zchange = -1;
       ystart = yend-1; yend = -1; ychange = -1;
       xstart = xend-1; xend = -1; xchange = -1;
       ann_to_use = ann_buf;
       other = ann;
+      annd_to_use = annd_buf;
+      annd_other = annd;
     }
     for (int az = zstart; az != zend; az += zchange){
       for (int ay = ystart; ay != yend; ay += ychange) {
         for (int ax = xstart; ax != xend; ax += xchange) { 
           unsigned char* v = ann_to_use->getRGB(az, ay, ax);
           int ybest = YfromRGB(v), xbest = XfromRGB(v), zbest = ZfromRGB(v);
-          int dbest = dist(a, b, ax, ay, az, xbest, ybest, zbest);
-          // int dbest = netINT(annd->getRGB(az, ay, ax));
+          int dbest = netINT(annd_to_use->getRGB(az, ay, ax));
 
           // Propagation
           if ((unsigned) (ax - xchange) < (unsigned) aew) {
@@ -245,6 +251,32 @@ void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf) {
               improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
             }
           }
+
+          if ((unsigned) (ax + xchange) < (unsigned) aew) {
+            unsigned char* vp = ann_to_use->getRGB(az, ay, ax + xchange);
+            int xp = XfromRGB(vp) - xchange, yp = YfromRGB(vp), zp = ZfromRGB(vp);
+            if ((unsigned) xp < (unsigned) bew) {
+              improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
+            }
+          }
+
+          if ((unsigned) (ay + ychange) < (unsigned) aeh) {
+            unsigned char* vp = ann_to_use->getRGB(az, ay + ychange, ax);
+            int xp = XfromRGB(vp), yp = YfromRGB(vp) - ychange, zp = ZfromRGB(vp);
+            if ((unsigned) yp < (unsigned) beh) {
+              improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
+            }
+          }
+
+          if ((unsigned) (az + zchange) < (unsigned) aed) {
+            unsigned char* vp = ann_to_use->getRGB(az + zchange, ay, ax);
+            int xp = XfromRGB(vp), yp = YfromRGB(vp), zp = ZfromRGB(vp) - zchange;
+            if ((unsigned) zp < (unsigned) bed) {
+              improve_guess(a, b, ax, ay, az, xbest, ybest, zbest, dbest, xp, yp, zp);
+            }
+          }
+
+
           int rs_start = random_search_max_span;
           if (rs_start > MAX(MAX(b->width, b->height), b->depth)) { rs_start = MAX(MAX(b->width, b->height), b->depth); }
           for (int mag = rs_start; mag >= 1; mag /= 2) {
@@ -273,7 +305,7 @@ void patchmatch(image *a, image *b, image *ann, image *annd, image *ann_buf) {
           }
 
           storeXYasRGB(other->getRGB(az, ay, ax), xbest, ybest, zbest);
-          // storeintasRGBA(annd->getRGB(az, ay, ax), dbest);
+          storeintasRGBA(annd_other->getRGB(az, ay, ax), dbest);
         }
       }
     }
@@ -341,20 +373,23 @@ int main(int argc, char **argv) {
 
   image* ann = NULL;
   image* annd = NULL;
+  image* annd_buf = NULL;
   image* ann_buf = NULL;
   ann = new image(img1 -> width, img1 -> height, img1 -> depth ,3);
   annd = new image(img1 -> width, img1 -> height, img1 -> depth ,4);
   ann_buf = new image(img1 -> width, img1 -> height, img1 -> depth ,3);
+  annd_buf = new image(img1 -> width, img1 -> height, img1 -> depth ,4);
   ann->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
   ann_buf->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
   annd->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*4);
+  annd_buf->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*4);
 
   image* output = new image(img1->width, img1->height, img1 -> depth,3);
   output->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
 
   cout << "Starting patch match" << endl;
   auto start1 = std::chrono::high_resolution_clock::now();
-  patchmatch(img1, img2, ann, annd, ann_buf);
+  patchmatch(img1, img2, ann, annd, ann_buf, annd_buf);
   auto finish1 = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = finish1 - start1;
   std::cout << "Patch Match Elapsed time: " << elapsed.count() << " s\n";
