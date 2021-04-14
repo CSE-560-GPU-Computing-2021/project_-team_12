@@ -332,11 +332,11 @@ int main(int argc, char **argv) {
   // Read input image 2
   struct image* img2 = NULL;
   img2 = new image(w, h, d, 3);
-	cout<<"Reading "<<argv[1]<<"... "<<endl;
+	cout<<"Reading "<<argv[2]<<"... "<<endl;
 	img2->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img2->width*img2->height*img2->depth*img2->nchannels);
   for (int i = 0; i < d; i ++){
     int temp_width, temp_height, temp_nchannels;
-    string path= argv[1]+ to_string(i) +".jpeg";
+    string path= argv[2]+ to_string(i) +".jpeg";
     unsigned char *img_in = stbi_load(path.c_str(), &temp_width, &temp_height, &temp_nchannels, 0);
     int start_idx = img2->width * img2 -> height * i * img2->nchannels;
     memcpy((void*)(img2 -> img_pixels + start_idx), img_in, sizeof(unsigned char)*temp_width*temp_height*temp_nchannels);

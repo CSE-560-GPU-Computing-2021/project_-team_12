@@ -6,12 +6,12 @@ from PIL import Image
 vol = sitk.ReadImage("./color/color_512_512_352.mhd")
 volArray = sitk.GetArrayFromImage(vol)
 print(volArray.shape, volArray.dtype)
-w_offset = 64
-h_offset = 256
-d_offset = 128
-w = 64
-h = 256
-d = 128
+w_offset = 100;
+h_offset = 100;
+d_offset = 100;
+w = 256;
+h = 256;
+d = 256;
 print(w, h, d)
 print("starting saving")
 print(d)

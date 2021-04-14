@@ -2,3 +2,6 @@ patchmatch/
 .vscode/
 a.out
 a.exe
+color/
+color/color_512_512_352.raw
+color/color_512_512_352.mhd

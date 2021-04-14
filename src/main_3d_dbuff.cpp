@@ -9,8 +9,13 @@
 #include <climits>
 #include <string>
 #include <math.h>
+#include <time.h>
+#include <chrono> 
 #include "define.h"
+using namespace std;
+
 // #include <bits/stdc++.h>
+
 
 #include "stb_image.h"
 #include "stb_image_write.h"
@@ -301,9 +306,6 @@ double compute_error(image* output, image* a)
 
 
 int main(int argc, char **argv) {
-	int d = 64;
-	int h = 256;
-	int w = 128;
   if(argc < 3) {
     cout<<"Usage: " << argv[0] << " <image_file1>  <image_file2>\n";
     return 1;
@@ -325,11 +327,11 @@ int main(int argc, char **argv) {
   // Read input image 2
   struct image* img2 = NULL;
   img2 = new image(w, h, d, 3);
-	cout<<"Reading "<<argv[1]<<"... "<<endl;
+	cout<<"Reading "<<argv[2]<<"... "<<endl;
 	img2->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img2->width*img2->height*img2->depth*img2->nchannels);
   for (int i = 0; i < d; i ++){
     int temp_width, temp_height, temp_nchannels;
-    string path= argv[1]+ to_string(i) +".jpeg";
+    string path= argv[2]+ to_string(i) +".jpeg";
     unsigned char *img_in = stbi_load(path.c_str(), &temp_width, &temp_height, &temp_nchannels, 0);
     int start_idx = img2->width * img2 -> height * i * img2->nchannels;
     memcpy((void*)(img2 -> img_pixels + start_idx), img_in, sizeof(unsigned char)*temp_width*temp_height*temp_nchannels);
@@ -351,11 +353,23 @@ int main(int argc, char **argv) {
   output->img_pixels = (unsigned char*) malloc(sizeof(unsigned char)*img1->width*img1->height*img1->depth*3);
 
   cout << "Starting patch match" << endl;
+  auto start1 = std::chrono::high_resolution_clock::now();
   patchmatch(img1, img2, ann, annd, ann_buf);
+  auto finish1 = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = finish1 - start1;
+  std::cout << "Patch Match Elapsed time: " << elapsed.count() << " s\n";
+
+  auto start2 = std::chrono::high_resolution_clock::now();
   cout << "starting map patches" << endl;
   map_patches(img1, img2, ann, output);
+  auto finish2 = std::chrono::high_resolution_clock::now();
+  elapsed = finish2 - start2;
+  std::cout << "Map Back Elapsed time: " << elapsed.count() << " s\n";
 
-  printf("%d %d %d\n",output->width, output->height, output->depth );
+  elapsed = finish2 - start1;
+  std::cout << "Total time Elapsed time: " << elapsed.count() << " s\n";
+
+  printf("depth = %d; height = %d; width = %d\n",output->depth, output->height, output->width );
 
   string output_folder = "./color/out/";
   string ann_folder = "./color/ann/";
@@ -375,7 +389,11 @@ int main(int argc, char **argv) {
     stbi_write_png(output_path.c_str(), output->width, output->height, 3, output->img_pixels + output_start_idx, output->width*3);
   }
 
-  cout << "The Error computed is " << compute_error(output, img1) << endl;
+  double error = compute_error(output, img1);
+  long pixels = d*w*h;
+  double per_pixel_error = error/pixels;
+  cout << "The Error computed is " << error << endl;
+  cout << "Per pixel error is "<<per_pixel_error << endl;
   
   return 0;
 }
