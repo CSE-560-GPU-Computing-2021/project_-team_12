@@ -338,11 +338,12 @@ double compute_error(image* output, image* a)
 
 
 int main(int argc, char **argv) {
+
   if(argc < 3) {
     cout<<"Usage: " << argv[0] << " <image_file1>  <image_file2>\n";
     return 1;
     }
-
+  // cout << w << h << d << endl;
   // Read input image 1
   struct image* img1 = NULL;
   img1 = new image(w, h, d, 3);

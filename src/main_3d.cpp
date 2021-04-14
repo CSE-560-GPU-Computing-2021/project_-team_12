@@ -389,6 +389,12 @@ int main(int argc, char **argv) {
     string output_path= output_folder+ to_string(i) +".png";
     stbi_write_png(output_path.c_str(), output->width, output->height, 3, output->img_pixels + output_start_idx, output->width*3);
   }
+
+  double error = compute_error(output, img1);
+  long pixels = d*w*h;
+  double per_pixel_error = error/pixels;
+  cout << "The Error computed is " << error << endl;
+  cout << "Per pixel error is "<<per_pixel_error << endl;
   
   return 0;
 }
